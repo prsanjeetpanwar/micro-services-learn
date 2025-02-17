@@ -8,6 +8,7 @@ import { RedisStore } from 'rate-limit-redis';
 import proxy from 'express-http-proxy';
 import logger from '../src/utils/logger.js';
 import errorHandler from '../src/middlewares/errorHandler.js';
+import { ValidateToken } from './middlewares/auth.middleware.js';
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const PORT = process.env.PORT || 3000;
 const redisClient = new Redis(process.env.REDIS_URL);
 
 app.use(helmet());
-app.use(cors());
+app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -71,7 +72,19 @@ app.use('/v1/auth', proxy(process.env.IDENTITY_SERVICE_URL, {
         return proxyResData;
     }
 }));
-
+app.use('/v1/posts', ValidateToken, proxy(process.env.POST_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+        proxyReqOpts.headers["Content-Type"] = "application/json";
+        proxyReqOpts.headers["x-user-id"] = srcReq.user.userId; 
+        logger.info(`Setting x-user-id header to: ${srcReq.user.userId}`);
+        return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+        logger.info(`Request received from post service: ${proxyRes.statusCode}`);
+        return proxyResData;
+    }
+}));
 app.use(errorHandler)
 
 
@@ -79,9 +92,9 @@ app.use(errorHandler)
 app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
     logger.info(`identity service  is running on port  ${process.env.IDENTITY_SERVICE_URL}`);
+    logger.info(`post service is running on port  ${process.env.POST_SERVICE_URL}`);
+    
     logger.info(`Redis Url ${process.env.REDIS_URL}`);
-
-
 
 });
 

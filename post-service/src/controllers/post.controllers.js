@@ -1,14 +1,23 @@
 import Post from '../models/post.model.js';
 import logger from '../utils/logger.js'
 import { StatusCodes } from 'http-status-codes';
+import { ValidatePost } from '../utils/ValidatePost.js';
 
 
 
 
 export const createPostHandler=async (req,res)=>{
     logger.info('createPostHandler is initiated....')
+
     try{
-        const {content,mediaIds}=req.body;
+        const {error}=ValidatePost(req.body)
+        if(error){
+            logger.warn(`Validation Error: ${error.details[0].message}`)
+            return res.status(StatusCodes.BAD_REQUEST).json({success:false,message:error.details[0].message})
+        }
+        
+        const {content,mediaIds}=req.bod
+
         const NewPost= new Post({
             user:req.user.userId,
             content,

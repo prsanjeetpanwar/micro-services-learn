@@ -6,12 +6,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import postRoute from './routes/post.routes.js';
 import logger from './utils/logger.js';
-import connectDB from './db/db.js';
+import {connectDB} from './db/db.js';
 import { RateLimiterRedis } from 'rate-limiter-flexible';
 import rateLimit from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import { StatusCodes } from 'http-status-codes';
-import errorHandler from './middlewares/auth.middleware.js';
+import errorHandler from './middlewares/errorHandler.middleware.js';
 
 dotenv.config();
 const app = express();
@@ -22,6 +22,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 const redisClient = new Redis(process.env.REDIS_URL);
+
+redisClient.on('error', (err) => {
+    logger.error('Redis Client Error:', err);
+});
+
+redisClient.on('connect', () => {
+    logger.info('Successfully connected to Redis');
+});
 connectDB();
 
 app.use((req, res, next) => {
@@ -58,9 +66,9 @@ const SensitiveEndpointsLimiter = rateLimit({
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    store: new RedisStore({
-        sendCommand: (command, ...args) => redisClient.sendCommand([command, ...args]),
-    }),
+    // store: new RedisStore({
+    //     sendCommand: (...args) => redisClient.sendCommand(args),
+    // }),
 });
 
 app.use(rateLimiterMiddleware);
@@ -77,13 +85,15 @@ app.listen(PORT, () => {
     logger.info(`Server is running on port ${PORT}`);
 });
 
-redisClient.on('error', (err) => {
-    logger.error(`Redis connection error: ${err.message}`);
-});
+// redisClient.on('error', (err) => {
+//     logger.error(`Redis connection error: ${err.message}`);
+// });
 
-redisClient.on('reconnecting', () => {
-    logger.warn('Reconnecting to Redis...');
-});
+// redisClient.on('reconnecting', () => {
+//     logger.warn('Reconnecting to Redis...');
+// });
+
+// 
 
 process.on('uncaughtException', (error) => {
     logger.error('Uncaught Exception:', {
